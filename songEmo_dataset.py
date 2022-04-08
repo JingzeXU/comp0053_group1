@@ -57,6 +57,7 @@ class SongEmoDataset(Dataset):
                 reltime_list, bpm_list = parse_bpm_lines(lines, fps)        
                 idc = closest_frame_idc(reltime_list, fps)
                 bpms = np.array(bpm_list, dtype=np.int32)
+                bpms -= bpms[0]  # Get the relative values to the first bpm.
                 
                 chosen_idc = idc[::3]
                 chosen_bpms = bpms[::3]

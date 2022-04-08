@@ -89,6 +89,7 @@ def save_dataset_tensor(root, dest):
             reltime_list, bpm_list = parse_bpm_lines(lines, fps)        
             idc = closest_frame_idc(reltime_list, fps)
             bpms = np.array(bpm_list, dtype=np.int32)
+            bpms -= bpms[0]  # Get the relative values to the first bpm.
 
             chosen_idc = idc[::3]
             chosen_bpms = bpms[::3]
@@ -106,6 +107,57 @@ def save_dataset_tensor(root, dest):
     
     path1 = os.path.join(dest, 'X.npy')
     path2 = os.path.join(dest, 'y.npy')
+    np.save(path1, X, allow_pickle=False)
+    np.save(path2, y, allow_pickle=False)
+    print(f"numpy arrays saved at {dest}.")
+    
+    
+def save_bpm_dataset_tensor(root, dest):
+    """Get dataset which has only bpm sequence as features, and save numpy arrays to dest dir."""
+    
+    X, y = None, None
+
+    for i, person in enumerate(os.listdir(root)):     
+        # Due to incompeteness of data from the last person, we don't use that data.
+        if i == 6:
+            break
+            
+        bpm_dir = os.path.join(root, person, 'bpm')
+        opf_dir = os.path.join(root, person, 'openface')   
+        with open(os.path.join(root, person, 'score.txt'), 'r') as f:
+            scores = f.readlines()
+            
+        file = os.listdir(opf_dir)[0]
+        filepath = os.path.join(opf_dir, file)
+        df = pd.read_csv(filepath)
+        data = df.to_numpy()
+        fps = round(1 / data[1, 2])
+        
+        for j, file in enumerate(os.listdir(bpm_dir)):
+            # These files have too few bpm values, skip this file.
+            if i == 4 and (j == 3 or j == 5):
+                continue
+                
+            filepath = os.path.join(bpm_dir, file)
+            with open(filepath, 'r') as f:
+                lines = f.readlines()
+            _, bpm_list = parse_bpm_lines(lines, fps)        
+            bpms = np.array(bpm_list, dtype=np.int32)
+            bpms -= bpms[0]  # Get the relative values to the first bpm.
+            
+            # People have different numbers of bpms, but we need to ensure the dimensions are the same.
+            features = bpms[:60].reshape(1, -1) 
+            score = np.array(scores[j], dtype=np.float64).reshape(1)
+            
+            if X is None:           
+                X = features
+                y = score
+            else:
+                X = np.concatenate([X, features], axis=0)
+                y = np.concatenate([y, score], axis=0)
+                
+    path1 = os.path.join(dest, 'X_bpm.npy')
+    path2 = os.path.join(dest, 'y_bpm.npy')
     np.save(path1, X, allow_pickle=False)
     np.save(path2, y, allow_pickle=False)
     print(f"numpy arrays saved at {dest}.")
